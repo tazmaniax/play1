@@ -1,8 +1,45 @@
 package play.db.jpa;
 
+import java.beans.PropertyDescriptor;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
+
+import javax.persistence.Embeddable;
+import javax.persistence.EmbeddedId;
+import javax.persistence.Entity;
+import javax.persistence.EntityManager;
+import javax.persistence.EntityManagerFactory;
+import javax.persistence.FlushModeType;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
+import javax.persistence.IdClass;
+import javax.persistence.ManyToMany;
+import javax.persistence.ManyToOne;
+import javax.persistence.MappedSuperclass;
+import javax.persistence.NoResultException;
+import javax.persistence.OneToMany;
+import javax.persistence.OneToOne;
+import javax.persistence.Persistence;
+import javax.persistence.PersistenceException;
+import javax.persistence.PersistenceUnit;
+import javax.persistence.Query;
+import javax.persistence.Transient;
+
 import org.apache.commons.beanutils.PropertyUtils;
 import org.apache.log4j.Level;
-import org.hibernate.ejb.Ejb3Configuration;
+import org.hibernate.metamodel.MetadataSources;
 
 import play.Logger;
 import play.Play;
@@ -12,20 +49,11 @@ import play.data.binding.Binder;
 import play.data.binding.NoBinding;
 import play.data.binding.ParamNode;
 import play.data.binding.RootParamNode;
+import play.db.Configuration;
 import play.db.DB;
 import play.db.Model;
-import play.db.Configuration;
 import play.exceptions.JPAException;
 import play.exceptions.UnexpectedException;
-import javax.persistence.*;
-
-import java.beans.PropertyDescriptor;
-import java.lang.annotation.Annotation;
-import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
-import java.lang.reflect.ParameterizedType;
-import java.util.*;
-import java.util.Collections;
 
 
 
@@ -119,24 +147,28 @@ public class JPAPlugin extends PlayPlugin {
      */
     @Override
     public void onApplicationStart() {
-        
-        
+    	
         org.hibernate.ejb.HibernatePersistence persistence = new org.hibernate.ejb.HibernatePersistence();
+        
+//        HibernatePersistenceProvider.
         // Update the configuration
         Play.configuration = Configuration.convertToMultiDB(Play.configuration);
                          
         for (String dbName : Configuration.getDbNames(Play.configuration)) {
-            Ejb3Configuration cfg = new Ejb3Configuration();
+//            Ejb3Configuration cfg = new Ejb3Configuration();
+            
+            MetadataSources metadataSources = null;
+            
             List<Class> classes = Play.classloader.getAnnotatedClasses(Entity.class);
             for (Class<?> clazz : classes) {
                 if (clazz.isAnnotationPresent(Entity.class)) {
                     // Do we have a transactional annotation matching our dbname?
                     PersistenceUnit pu = clazz.getAnnotation(PersistenceUnit.class);
                     if (pu != null && pu.name().equals(dbName)) {
-                      cfg.addAnnotatedClass(clazz);
+                    	metadataSources.addAnnotatedClass(clazz);
                       Logger.info("Add JPA Model : %s to db %s", clazz, dbName);
                     } else if (pu == null && JPA.DEFAULT.equals(dbName)) {
-                      cfg.addAnnotatedClass(clazz);
+                    	metadataSources.addAnnotatedClass(clazz);
                       Logger.info("Add JPA Model : %s to db %s", clazz, dbName);
                     }                    
                 }
@@ -161,7 +193,7 @@ public class JPAPlugin extends PlayPlugin {
             cfg.configure(Configuration.addHibernateProperties(properties, dbName));
             cfg.setDataSource(DB.getDataSource(dbName));
           
-            JPA.emfs.put(dbName, cfg.buildEntityManagerFactory());
+            JPA.emfs.put(dbName, Persistence.createEntityManagerFactory(dbName, properties));
             
             try {
                 Field field = cfg.getClass().getDeclaredField("overridenClassLoader");

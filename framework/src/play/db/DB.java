@@ -5,21 +5,21 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 import javax.sql.DataSource;
 import javax.sql.RowSet;
 import javax.sql.rowset.CachedRowSet;
 
 import org.hibernate.internal.SessionImpl;
 
-import com.sun.rowset.CachedRowSetImpl;
-
+import play.Logger;
 import play.db.jpa.JPA;
 import play.exceptions.DatabaseException;
-import play.Logger;
-import java.util.concurrent.ConcurrentHashMap;
+
+import com.sun.rowset.CachedRowSetImpl;
 
 /**
  * Database connection utilities.
@@ -132,7 +132,7 @@ public class DB {
     public static Connection getConnection(String name) {
         try {
             if (JPA.isEnabled()) {
-               return ((SessionImpl)((org.hibernate.ejb.EntityManagerImpl) JPA.em(name)).getSession()).connection();
+               return ((SessionImpl)((org.hibernate.jpa.internal.EntityManagerImpl) JPA.em(name)).getSession()).connection();
             }
             
             final Connection localConnection = getLocalConnection(name);
