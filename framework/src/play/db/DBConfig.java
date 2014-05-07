@@ -1,5 +1,28 @@
 package play.db;
 
+import com.mchange.v2.c3p0.ComboPooledDataSource;
+import com.mchange.v2.c3p0.ConnectionCustomizer;
+import com.sun.rowset.CachedRowSetImpl;
+
+import jregex.Matcher;
+
+import org.apache.commons.lang.StringUtils;
+import org.hibernate.internal.SessionImpl;
+
+import play.Logger;
+import play.Play;
+import play.db.jpa.JPA;
+import play.db.jpa.JPAPlugin;
+import play.db.jpa.JPAConfig;
+import play.db.jpa.JPAContext;
+import play.exceptions.DatabaseException;
+
+import javax.naming.Context;
+import javax.naming.InitialContext;
+import javax.sql.DataSource;
+import javax.sql.RowSet;
+import javax.sql.rowset.CachedRowSet;
+
 import java.io.File;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -299,6 +322,20 @@ public class DBConfig {
                     ds.setIdleConnectionTestPeriod(10);
                     ds.setTestConnectionOnCheckin(true);
 
+                    if (p.getProperty(propsPrefix+".testquery") != null) {
+			    ds.setPreferredTestQuery(p.getProperty(propsPrefix+".testquery"));
+                    } else {
+                        String driverClass = JPAPlugin.getDefaultDialect(propsPrefix, ds.getDriverClass());
+
+                        /*
+                         * Pulled from http://dev.mysql.com/doc/refman/5.5/en/connector-j-usagenotes-j2ee-concepts-connection-pooling.html
+                         * Yes, the select 1 also needs to be in there.
+                         */
+                        if (driverClass.equals("play.db.jpa.MySQLDialect")) {
+                            ds.setPreferredTestQuery("/* ping */ SELECT 1");
+                        }
+                    }
+
                     // This check is not required, but here to make it clear that nothing changes for people
                     // that don't set this configuration property. It may be safely removed.
                     if(p.getProperty("db.isolation") != null) {
@@ -370,6 +407,7 @@ public class DBConfig {
         out.println("Max pool size: " + ds.getMaxPoolSize());
         out.println("Initial pool size: " + ds.getInitialPoolSize());
         out.println("Checkout timeout: " + ds.getCheckoutTimeout());
+        out.println("Test query : " + ds.getPreferredTestQuery());
         return sw.toString();
     }
 
